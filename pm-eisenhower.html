@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f7fb">
+  <title>PM 艾森豪矩陣</title>
+  <style>
+    :root { --ink:#1c2440; --muted:#69718a; --line:#e3e6ef; --card:#fff; --bg:#f7f7fb; --shadow:0 12px 35px rgba(29,39,71,.07); }
+    * { box-sizing:border-box; }
+    body { margin:0; color:var(--ink); background:var(--bg); font-family:-apple-system,BlinkMacSystemFont,"PingFang TC","Noto Sans TC",sans-serif; }
+    button,input,textarea { font:inherit; }
+    .app { max-width:1320px; margin:auto; padding:36px 24px 56px; }
+    header { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; margin-bottom:26px; }
+    h1 { font-size:clamp(28px,4vw,40px); margin:0 0 7px; letter-spacing:-.04em; }
+    .subtitle { color:var(--muted); margin:0; font-size:15px; }
+    .actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:9px; }
+    button, .file-label { border:1px solid var(--line); background:#fff; color:var(--ink); padding:10px 13px; border-radius:10px; cursor:pointer; font-weight:650; font-size:14px; transition:.16s ease; }
+    button:hover,.file-label:hover { transform:translateY(-1px); border-color:#bcc5db; box-shadow:0 5px 14px rgba(25,35,63,.08); }
+    .primary { background:#4759d7; color:#fff; border-color:#4759d7; }
+    .danger { color:#b54343; }
+    .file-label input { display:none; }
+    .guide { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; margin:0 0 18px; }
+    .guide div { background:white; border:1px solid var(--line); padding:12px; border-radius:12px; color:var(--muted); font-size:13px; }
+    .guide strong { display:block; color:var(--ink); margin-bottom:2px; }
+    .matrix-shell { display:grid; grid-template-columns:58px minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); gap:9px 12px; }
+    .axis-corner { align-self:end; color:#7a8298; font-size:12px; line-height:1.35; font-weight:700; text-align:right; padding:0 2px 8px 0; }
+    .axis-corner span { display:block; }
+    .column-labels { display:grid; grid-template-columns:1fr 1fr; gap:16px; color:#5d6680; font-size:14px; font-weight:750; text-align:center; }
+    .column-labels span { padding:0 0 7px; border-bottom:2px solid #ccd2e2; }
+    .row-labels { display:grid; grid-template-rows:1fr 1fr; gap:16px; color:#5d6680; font-size:13px; font-weight:750; text-align:center; }
+    .row-labels span { display:flex; align-items:center; justify-content:center; writing-mode:vertical-rl; letter-spacing:.12em; border-right:2px solid #ccd2e2; }
+    .matrix { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .quadrant { min-height:300px; border-radius:18px; padding:18px; border:1px solid var(--line); background:var(--card); box-shadow:var(--shadow); }
+    .quadrant[data-quadrant="do"] { border-top:5px solid #e2665f; }
+    .quadrant[data-quadrant="schedule"] { border-top:5px solid #e2aa4f; }
+    .quadrant[data-quadrant="delegate"] { border-top:5px solid #4c9ac2; }
+    .quadrant[data-quadrant="eliminate"] { border-top:5px solid #8d92a2; }
+    .q-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; margin-bottom:15px; }
+    .q-head h2 { font-size:18px; margin:0 0 4px; }
+    .q-head p { margin:0; color:var(--muted); font-size:13px; }
+    .add-mini { padding:7px 10px; font-size:13px; white-space:nowrap; }
+    .task-list { min-height:185px; display:flex; flex-direction:column; gap:9px; border-radius:11px; }
+    .task-list.drag-over { outline:2px dashed #7786df; outline-offset:5px; }
+    .empty { color:#9da4b6; font-size:14px; text-align:center; padding:58px 10px; }
+    .task { display:grid; grid-template-columns:20px 1fr auto; gap:9px; align-items:start; padding:12px; background:#fff; border:1px solid var(--line); border-radius:11px; cursor:grab; }
+    .task:active { cursor:grabbing; }
+    .task.done { opacity:.58; }
+    .task.done .task-title { text-decoration:line-through; }
+    .task input[type=checkbox] { width:17px; height:17px; margin:2px 0 0; accent-color:#4759d7; cursor:pointer; }
+    .task-title { font-size:14px; line-height:1.45; font-weight:650; white-space:pre-wrap; word-break:break-word; }
+    .task-meta { margin-top:5px; font-size:12px; color:var(--muted); }
+    .icon { background:transparent; border:0; color:#8b92a4; padding:0 2px; box-shadow:none!important; transform:none!important; font-size:18px; line-height:20px; }
+    dialog { border:0; border-radius:18px; max-width:520px; width:calc(100% - 32px); padding:0; box-shadow:0 22px 65px rgba(18,27,55,.24); }
+    dialog::backdrop { background:rgba(21,28,54,.38); }
+    form { padding:24px; }
+    form h2 { margin:0 0 18px; font-size:22px; }
+    label { display:block; font-weight:650; margin:13px 0 6px; font-size:14px; }
+    input[type=text],input[type=date],textarea,select { width:100%; padding:10px 11px; border:1px solid #d9ddea; border-radius:9px; background:#fff; color:var(--ink); }
+    textarea { height:85px; resize:vertical; }
+    .form-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .modal-actions { display:flex; justify-content:flex-end; gap:9px; margin-top:21px; }
+    .modal-actions button { min-width:80px; }
+    footer { color:var(--muted); font-size:13px; text-align:center; margin-top:24px; }
+    @media (max-width:760px) { .app{padding:24px 14px 42px} header{display:block}.actions{justify-content:flex-start;margin-top:17px}.guide{grid-template-columns:1fr 1fr}.matrix-shell{grid-template-columns:38px minmax(0,1fr);gap:7px}.axis-corner{font-size:10px}.column-labels{gap:10px;font-size:12px}.row-labels{gap:10px;font-size:11px}.matrix{gap:10px}.quadrant{min-height:250px;padding:13px}.q-head h2{font-size:16px}.form-grid{grid-template-columns:1fr} }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div><h1>PM 艾森豪矩陣</h1><p class="subtitle">把任務放到對的位置，專注下一步。</p></div>
+      <div class="actions">
+        <button id="exportBtn">匯出備份</button>
+        <label class="file-label">匯入備份<input id="importInput" type="file" accept="application/json"></label>
+        <button class="danger" id="clearBtn">清除所有資料</button>
+        <button class="primary" id="newTaskBtn">＋ 新增任務</button>
+      </div>
+    </header>
+    <section class="guide" aria-label="矩陣說明">
+      <div><strong>立即處理</strong>重要且緊急</div><div><strong>排程處理</strong>重要但不緊急</div>
+      <div><strong>委派／快速處理</strong>緊急但不重要</div><div><strong>刪除／延後</strong>不重要也不緊急</div>
+    </section>
+    <section class="matrix-shell" aria-label="艾森豪矩陣">
+      <div class="axis-corner"><span>重要性 ↑</span><span>緊急度 →</span></div>
+      <div class="column-labels"><span>緊急</span><span>不緊急</span></div>
+      <div class="row-labels"><span>重要</span><span>不重要</span></div>
+      <section class="matrix" id="matrix"></section>
+    </section>
+    <footer>資料僅儲存在此瀏覽器與此裝置；請定期匯出備份。</footer>
+  </main>
+
+  <dialog id="taskDialog">
+    <form id="taskForm" method="dialog">
+      <h2 id="dialogTitle">新增任務</h2>
+      <input id="taskId" type="hidden">
+      <label for="taskTitle">任務名稱</label><input id="taskTitle" type="text" maxlength="160" required placeholder="例如：確認客戶需求文件" autofocus>
+      <div class="form-grid">
+        <div><label for="taskQuadrant">放入哪個象限？</label><select id="taskQuadrant"></select></div>
+        <div><label for="taskDue">截止日（選填）</label><input id="taskDue" type="date"></div>
+      </div>
+      <label for="taskNote">備註（選填）</label><textarea id="taskNote" maxlength="600" placeholder="下一步、會議資訊或提醒…"></textarea>
+      <div class="modal-actions"><button type="button" id="cancelBtn">取消</button><button class="primary" value="default">儲存</button></div>
+    </form>
+  </dialog>
+
+  <script>
+    const STORAGE_KEY = 'pm-eisenhower-tasks-v1';
+    const quadrants = {
+      do: { title:'立即處理', desc:'重要且緊急' }, schedule: { title:'排程處理', desc:'重要但不緊急' },
+      delegate: { title:'委派／快速處理', desc:'緊急但不重要' }, eliminate: { title:'刪除／延後', desc:'不重要也不緊急' }
+    };
+    let tasks = [];
+    try { tasks = JSON.parse(localStorage.getItem(STORAGE_KEY)) || []; } catch { tasks = []; }
+    const matrix = document.querySelector('#matrix'), dialog = document.querySelector('#taskDialog'), form = document.querySelector('#taskForm');
+    const select = document.querySelector('#taskQuadrant');
+    select.innerHTML = Object.entries(quadrants).map(([key,q]) => `<option value="${key}">${q.title}</option>`).join('');
+    const escapeHtml = value => String(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#039;','"':'&quot;'}[c]));
+    const save = () => localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks));
+    const dateText = date => date ? new Intl.DateTimeFormat('zh-TW',{month:'short',day:'numeric'}).format(new Date(date+'T12:00:00')) : '';
+    function render() {
+      matrix.innerHTML = Object.entries(quadrants).map(([key,q]) => {
+        const items = tasks.filter(t => t.quadrant === key);
+        return `<article class="quadrant" data-quadrant="${key}"><div class="q-head"><div><h2>${q.title}</h2><p>${q.desc}</p></div><button class="add-mini" data-add="${key}">＋ 新增</button></div><div class="task-list" data-drop="${key}">${items.length ? items.map(t => `<div class="task ${t.done?'done':''}" draggable="true" data-id="${t.id}"><input type="checkbox" data-check="${t.id}" ${t.done?'checked':''} aria-label="完成任務"><div><div class="task-title">${escapeHtml(t.title)}</div>${t.due ? `<div class="task-meta">截止：${dateText(t.due)}</div>`:''}${t.note ? `<div class="task-meta">${escapeHtml(t.note)}</div>`:''}</div><button class="icon" data-edit="${t.id}" aria-label="編輯任務">⋯</button></div>`).join('') : '<div class="empty">暫無任務<br>點「新增」或拖曳任務到這裡</div>'}</div></article>`;
+      }).join('');
+    }
+    function openTask(task = null, quadrant = 'do') {
+      document.querySelector('#dialogTitle').textContent = task ? '編輯任務' : '新增任務';
+      document.querySelector('#taskId').value = task?.id || '';
+      document.querySelector('#taskTitle').value = task?.title || '';
+      document.querySelector('#taskQuadrant').value = task?.quadrant || quadrant;
+      document.querySelector('#taskDue').value = task?.due || '';
+      document.querySelector('#taskNote').value = task?.note || '';
+      dialog.showModal(); document.querySelector('#taskTitle').focus();
+    }
+    document.querySelector('#newTaskBtn').onclick = () => openTask();
+    document.querySelector('#cancelBtn').onclick = () => dialog.close();
+    matrix.addEventListener('click', e => {
+      const add = e.target.closest('[data-add]'); if(add) return openTask(null, add.dataset.add);
+      const edit = e.target.closest('[data-edit]'); if(edit) return openTask(tasks.find(t => t.id === edit.dataset.edit));
+      const check = e.target.closest('[data-check]'); if(check) { const t = tasks.find(t => t.id === check.dataset.check); t.done = check.checked; save(); render(); }
+    });
+    form.addEventListener('submit', e => { e.preventDefault(); const id = document.querySelector('#taskId').value; const data = { id:id || crypto.randomUUID(), title:document.querySelector('#taskTitle').value.trim(), quadrant:select.value, due:document.querySelector('#taskDue').value, note:document.querySelector('#taskNote').value.trim(), done:false }; if(!data.title) return; const old = tasks.findIndex(t => t.id === id); old >= 0 ? tasks[old] = {...tasks[old],...data} : tasks.unshift(data); save(); render(); dialog.close(); });
+    matrix.addEventListener('dragstart', e => { const task=e.target.closest('.task'); if(task) e.dataTransfer.setData('text/plain',task.dataset.id); });
+    matrix.addEventListener('dragover', e => { const list=e.target.closest('[data-drop]'); if(list) { e.preventDefault(); list.classList.add('drag-over'); } });
+    matrix.addEventListener('dragleave', e => { const list=e.target.closest('[data-drop]'); if(list) list.classList.remove('drag-over'); });
+    matrix.addEventListener('drop', e => { const list=e.target.closest('[data-drop]'); if(!list) return; e.preventDefault(); list.classList.remove('drag-over'); const t=tasks.find(t=>t.id===e.dataTransfer.getData('text/plain')); if(t) { t.quadrant=list.dataset.drop; save(); render(); } });
+    document.querySelector('#exportBtn').onclick = () => { const blob = new Blob([JSON.stringify({version:1, exportedAt:new Date().toISOString(), tasks},null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=`pm-matrix-backup-${new Date().toISOString().slice(0,10)}.json`; a.click(); URL.revokeObjectURL(a.href); };
+    document.querySelector('#importInput').onchange = async e => { const file=e.target.files[0]; if(!file) return; try { const data=JSON.parse(await file.text()); if(!Array.isArray(data.tasks)) throw new Error(); if(!confirm('匯入會取代目前所有任務，確定嗎？')) return; tasks=data.tasks.filter(t=>t && t.id && t.title && quadrants[t.quadrant]); save(); render(); } catch { alert('這不是有效的備份檔。'); } finally { e.target.value=''; } };
+    document.querySelector('#clearBtn').onclick = () => { if(confirm('確定要清除所有任務嗎？此動作無法復原，建議先匯出備份。')) { tasks=[]; save(); render(); } };
+    render();
+  </script>
+</body>
+</html>
