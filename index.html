@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0f172a" />
+    <title>PM + Personal PM｜艾森豪矩陣工作台</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand-row"><div class="brand"><span class="brand-mark">P</span><span class="brand-name">PM / personal pm</span></div><button class="sidebar-toggle" id="sidebarToggle" aria-label="收起側邊欄" aria-pressed="false">‹</button></div>
+        <div class="workspace-switcher">
+          <div class="avatar gradient">YC</div>
+          <div class="workspace-copy"><strong>Yong Chen</strong><small>個人工作區</small></div>
+          <span class="chevron">⌄</span>
+        </div>
+        <nav class="main-nav" aria-label="主要導覽">
+          <p class="nav-label">PM + PERSONAL PM</p>
+          <button class="nav-item active"><span class="nav-icon">⊞</span><span class="nav-text">矩陣總覽</span><span class="nav-count" id="matrixCount">0</span></button>
+          <button class="nav-item"><span class="nav-icon">✓</span><span class="nav-text">我的任務</span><span class="nav-count muted" id="myTaskCount">0</span></button>
+          <button class="nav-item"><span class="nav-icon">◷</span><span class="nav-text">時間安排</span></button>
+          <button class="nav-item"><span class="nav-icon">⌁</span><span class="nav-text">分析報告</span></button>
+        </nav>
+        <div class="sidebar-bottom">
+          <button class="nav-item"><span class="nav-icon">?</span><span class="nav-text">使用指南</span></button>
+          <button class="nav-item"><span class="nav-icon">⚙</span><span class="nav-text">設定</span></button>
+          <div class="upgrade-card"><div class="sparkle">✦</div><strong>升級你的工作流</strong><p>解鎖無限專案與進階分析。</p><button>查看方案 <span>→</span></button></div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <div class="breadcrumb"><span>工作區</span><b>/</b><strong>矩陣總覽</strong></div>
+          <div class="top-actions"><button class="icon-button" aria-label="通知">♧<i></i></button><div class="top-avatar">YC</div></div>
+        </header>
+
+        <div class="page-container">
+          <section class="hero-row">
+            <div><div class="eyebrow"><span class="pulse-dot"></span><span id="todayLabel">今天</span></div><h1>早安，Yong <span>👋</span></h1><p class="hero-subtitle">把注意力放在真正重要的事情上。</p></div>
+            <div class="hero-actions"><button class="secondary-button" id="todayBtn">⌕ <span>今天</span></button><button class="primary-button" id="openModal"><span>＋</span>新增任務</button></div>
+          </section>
+
+          <section class="stats-grid">
+            <article class="stat-card"><div class="stat-heading"><span>今日專注</span><span class="stat-icon blue-icon">◷</span></div><div class="stat-value">0<span class="stat-unit">h 0m</span></div><div class="stat-meta neutral">尚未安排專注時間 <span>新增任務後開始</span></div><div class="mini-bars empty-bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></article>
+            <article class="stat-card"><div class="stat-heading"><span>完成任務</span><span class="stat-icon green-icon">✓</span></div><div class="stat-value"><span id="completedCount">0</span><span class="stat-unit">/ <span id="totalCount">0</span></span></div><div class="stat-meta neutral" id="completionMeta">先新增一個任務 <span>開始整理今天</span></div><div class="progress-line"><span id="completionProgress" style="width:0%"></span></div><div class="progress-label"><span>完成率</span><strong id="completionRate">0%</strong></div></article>
+            <article class="stat-card"><div class="stat-heading"><span>本週連續</span><span class="stat-icon purple-icon">✦</span></div><div class="stat-value">0<span class="stat-unit">天</span></div><div class="stat-meta neutral">完成第一個任務後開始累積</div><div class="week-dots"><i>一</i><i>二</i><i>三</i><i>四</i><i>五</i><i>六</i><i>日</i></div></article>
+          </section>
+
+          <section class="content-header"><div><h2>艾森豪矩陣</h2><p>依照「重要」與「緊急」分類 PM 專案與個人任務。</p></div><div class="view-tools"><div class="search-wrap"><span>⌕</span><input id="searchInput" placeholder="搜尋任務..." /></div><div class="mode-switch" role="group" aria-label="任務模式"><button class="mode-button active" data-scope="all">全部</button><button class="mode-button" data-scope="pm">PM 專案</button><button class="mode-button" data-scope="personal">Personal PM</button></div><button class="filter-button" id="filterBtn">≡ <span>篩選</span></button><button class="backup-button" id="exportBtn" aria-label="匯出資料">↥ 匯出資料</button><label class="backup-button import-label">↧ 匯入<input id="importInput" type="file" accept="application/json" /></label><button class="backup-button danger-button" id="clearBtn" aria-label="刪除全部任務">刪除全部</button><button class="view-button active">▦</button><button class="view-button">☷</button></div></section>
+
+          <section class="matrix-stage">
+            <div class="axis-title axis-title-y">重要性</div>
+            <div class="axis-title axis-title-x">緊急程度</div>
+            <div class="axis-y-label"><span>重要</span><span>不重要</span></div>
+            <div class="matrix-board">
+              <div class="axis-x-label"><span>緊急</span><span>不緊急</span></div>
+              <div class="axis-cross axis-cross-x"></div><div class="axis-cross axis-cross-y"></div>
+              <section class="matrix-grid" id="matrixGrid">
+                <div class="quadrant q1" data-quadrant="do"><div class="quadrant-header"><div class="quadrant-title"><span class="quadrant-number">01</span><div><h3>立即處理</h3><p>重要且緊急</p></div></div><span class="task-count">3</span></div><div class="task-list" id="doList"></div><button class="add-task-link" data-add="do">＋ 新增任務</button></div>
+                <div class="quadrant q2" data-quadrant="schedule"><div class="quadrant-header"><div class="quadrant-title"><span class="quadrant-number">02</span><div><h3>安排時間</h3><p>重要但不緊急</p></div></div><span class="task-count">3</span></div><div class="task-list" id="scheduleList"></div><button class="add-task-link" data-add="schedule">＋ 新增任務</button></div>
+                <div class="quadrant q3" data-quadrant="delegate"><div class="quadrant-header"><div class="quadrant-title"><span class="quadrant-number">03</span><div><h3>授權處理</h3><p>不重要但緊急</p></div></div><span class="task-count">2</span></div><div class="task-list" id="delegateList"></div><button class="add-task-link" data-add="delegate">＋ 新增任務</button></div>
+                <div class="quadrant q4" data-quadrant="delete"><div class="quadrant-header"><div class="quadrant-title"><span class="quadrant-number">04</span><div><h3>稍後再做</h3><p>不重要且不緊急</p></div></div><span class="task-count">2</span></div><div class="task-list" id="deleteList"></div><button class="add-task-link" data-add="delete">＋ 新增任務</button></div>
+              </section>
+            </div>
+          </section>
+
+          <section class="focus-section"><div class="section-title-row"><div><h2>今日時間安排</h2><p>讓每一小時都用在刀口上。</p></div><button class="text-button">查看完整行程 <span>→</span></button></div><div class="schedule-card"><div class="schedule-timeline"><div class="time-label">09:00</div><div class="time-label">10:00</div><div class="time-label">11:00</div><div class="time-label">12:00</div></div><div class="schedule-events"><div class="schedule-empty">尚未安排今日行程<br><span>新增任務後，再把時間留給重要的事。</span></div></div></div></section>
+        </div>
+      </main>
+    </div>
+
+    <div class="modal-backdrop" id="modalBackdrop"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitle"><button class="close-modal" id="closeModal">×</button><div class="modal-kicker" id="modalKicker">新增工作項目</div><h2 id="modalTitle">把下一件重要的事放進計畫</h2><form id="taskForm"><input id="taskId" type="hidden" /><label>任務名稱<input id="taskTitle" required placeholder="例如：準備週會簡報" /></label><label>歸屬模式<select id="taskScope"><option value="personal">Personal PM｜個人任務</option><option value="pm">PM｜專案任務</option></select></label><label>歸屬象限<select id="taskQuadrant"><option value="do">立即處理｜重要且緊急</option><option value="schedule">安排時間｜重要但不緊急</option><option value="delegate">授權處理｜不重要但緊急</option><option value="delete">稍後再做｜不重要且不緊急</option></select></label><div class="form-row"><label>分類<select id="taskProject"><option>個人</option><option>工作</option><option>學習</option><option>生活</option><option>健康</option><option>財務</option></select></label><label>截止日期<input id="taskDate" type="date" /></label></div><label>備註（選填）<textarea id="taskNote" rows="3" placeholder="補充一些背景或下一步..." ></textarea></label><button class="primary-button submit-button" type="submit" id="submitTask">建立任務 <span>→</span></button></form></div></div>
+    <script src="app.js"></script>
+  </body>
+</html>
