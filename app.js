@@ -7,9 +7,10 @@ const scopeKeys = ['pm', 'personal'];
 const PROFILE_STORAGE_KEY = 'priorix-profile-v1';
 const SUPABASE_URL = 'https://tjhcjhopjvaajhjnihjk.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_35IIzIC2QYvaCaGbzj3erQ_iEH6Gj2h';
-const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-let supabaseAccessToken = null;
-const TASKS_ENDPOINT = `${SUPABASE_URL}/rest/v1/pm_tasks`;
+const MATRIX_ACCESS_URL = `${SUPABASE_URL}/functions/v1/matrix-access`;
+const ACCESS_CODE_KEY = 'priorix-matrix-access-code';
+let accessCode = '';
+try { accessCode = localStorage.getItem(ACCESS_CODE_KEY) || ''; } catch { /* 需要時可再次輸入編號 */ }
 const lists = { do: document.querySelector('#doList'), schedule: document.querySelector('#scheduleList'), delegate: document.querySelector('#delegateList'), delete: document.querySelector('#deleteList') };
 const appShell = document.querySelector('.app-shell');
 const sidebarToggle = document.querySelector('#sidebarToggle');
@@ -64,36 +65,26 @@ function readStoredTasks() {
 let tasks = readStoredTasks();
 let taskSyncPending = false;
 let taskSyncFailed = false;
-function taskToRow(task) {
-  return { task_id: String(task.id), title: task.title, scope: task.scope, project: task.project || '個人', due: /^\d{4}-\d{2}-\d{2}$/.test(task.due || '') ? task.due : null, due_label: task.dueLabel || dueText(task.due), quadrant: task.quadrant, note: task.note || '', done: Boolean(task.done), focus_minutes: Number(task.focusMinutes) || 0, focus_date: Number(task.focusMinutes) > 0 ? (task.focusDate || localDateKey()) : null, completed_at: task.completedAt || null };
-}
-function rowToTask(row) {
-  return { id: row.task_id, title: row.title, scope: row.scope, project: row.project, due: row.due || '', dueLabel: row.due_label || dueText(row.due), quadrant: row.quadrant, note: row.note || '', done: row.done, focusMinutes: row.focus_minutes || 0, focusDate: row.focus_date || '', completedAt: row.completed_at || null };
-}
 function localDateKey(date = new Date()) { return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`; }
-async function requestTasks(method, rows) {
-  const response = await fetch(method === 'GET' ? `${TASKS_ENDPOINT}?select=*&order=updated_at.asc` : TASKS_ENDPOINT, {
-    method,
-    headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${supabaseAccessToken}`, 'Content-Type': 'application/json', ...(method === 'POST' ? { Prefer: 'resolution=merge-duplicates,return=minimal' } : {}) },
-    ...(rows ? { body: JSON.stringify(rows) } : {})
+async function matrixRequest(action, payload = {}) {
+  const response = await fetch(MATRIX_ACCESS_URL, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_PUBLISHABLE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...payload })
   });
-  if (!response.ok) throw new Error(`Supabase task request failed: ${response.status}`);
-  return method === 'GET' ? response.json() : null;
-}
-async function syncTasks() {
-  const current = await requestTasks('GET');
-  const keep = new Set(tasks.map(task => String(task.id)));
-  const obsolete = current.map(row => row.task_id).filter(id => !keep.has(String(id)));
-  if (obsolete.length) {
-    const response = await fetch(`${TASKS_ENDPOINT}?task_id=in.${encodeURIComponent(`(${obsolete.join(',')})`)}`, { method: 'DELETE', headers: { apikey: SUPABASE_PUBLISHABLE_KEY, Authorization: `Bearer ${supabaseAccessToken}` } });
-    if (!response.ok) throw new Error(`Supabase task delete failed: ${response.status}`);
+  const result = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(result.error || `連線失敗（${response.status}）`);
+    error.status = response.status;
+    throw error;
   }
-  if (tasks.length) await requestTasks('POST', tasks.map(taskToRow));
+  return result;
 }
+async function syncTasks() { if (accessCode) await matrixRequest('save', { code: accessCode, tasks }); }
 function save() {
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); } catch { /* 保留本次工作階段資料 */ }
   taskSyncPending = true;
-  if (supabaseAccessToken) syncTasks().then(() => {
+  if (accessCode) syncTasks().then(() => {
     taskSyncPending = false;
     taskSyncFailed = false;
     document.querySelector('#syncNotice').hidden = true;
@@ -105,10 +96,10 @@ function save() {
   });
 }
 async function loadRemoteTasks() {
-  const rows = await requestTasks('GET');
-  if (rows.length) tasks = rows.map(rowToTask);
-  else if (tasks.length) await syncTasks();
-  else tasks = [];
+  if (!accessCode) return;
+  const account = await matrixRequest('load', { code: accessCode });
+  tasks = account.tasks || [];
+  applyProfile(account.profile);
   try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); } catch { /* 保留本次工作階段資料 */ }
   taskSyncPending = false;
   taskSyncFailed = false;
@@ -179,42 +170,139 @@ const backdrop = document.querySelector('#modalBackdrop');
 const form = document.querySelector('#taskForm');
 const profileBackdrop = document.querySelector('#profileBackdrop');
 const profileForm = document.querySelector('#profileForm');
-function openProfile(changeUser = false) {
+const accessCodeBackdrop = document.querySelector('#accessCodeBackdrop');
+const accessCodeForm = document.querySelector('#accessCodeForm');
+const createCodeBackdrop = document.querySelector('#createCodeBackdrop');
+const createCodeForm = document.querySelector('#createCodeForm');
+let isInitialProfileSetup = false;
+function refreshAccessControls() { document.querySelector('#createMatrixCodeBtn').hidden = Boolean(accessCode); }
+function openProfile(initialSetup = false) {
+  isInitialProfileSetup = initialSetup;
   document.querySelector('#profileName').value = profile?.name || '';
   document.querySelector('#profilePurpose').value = profile?.purpose || 'personal';
-  document.querySelector('#profileTitle').textContent = changeUser ? '輸入新的使用者設定' : (profile ? '更新你的使用設定' : '先告訴我怎麼稱呼你');
-  document.querySelector('.profile-modal .modal-kicker').textContent = changeUser ? '更換使用者' : (profile ? '個人設定' : '開始使用');
-  profileForm.querySelector('button[type="submit"]').innerHTML = changeUser ? '套用新設定 <span>→</span>' : (profile ? '儲存設定 <span>→</span>' : '開始使用 <span>→</span>');
+  document.querySelector('#hasMatrixCodeField').hidden = !initialSetup;
+  document.querySelector('#initialAccessCodeField').hidden = true;
+  document.querySelector('#initialCodeHint').hidden = true;
+  document.querySelector('#hasMatrixCode').value = 'no';
+  document.querySelector('#initialAccessCode').required = false;
+  document.querySelector('#initialAccessCode').value = '';
+  document.querySelector('#profileTitle').textContent = initialSetup ? '建立你的使用者設定' : '更新你的使用設定';
+  document.querySelector('.profile-modal .modal-kicker').textContent = initialSetup ? '開始使用' : '個人設定';
+  profileForm.querySelector('button[type="submit"]').innerHTML = initialSetup ? '開始使用 <span>→</span>' : '儲存設定 <span>→</span>';
   document.querySelector('#profileFormStatus').textContent = '';
   profileBackdrop.classList.add('visible');
   document.querySelector('#profileName').focus();
 }
 function closeProfile() { profileBackdrop.classList.remove('visible'); }
+function openAccessCodeModal() {
+  const panel = document.querySelector('#currentCodePanel');
+  panel.hidden = !accessCode;
+  document.querySelector('#currentAccessCode').value = accessCode;
+  document.querySelector('#accessCodeInput').value = '';
+  document.querySelector('#accessCodeStatus').textContent = '';
+  accessCodeBackdrop.classList.add('visible');
+}
+function closeAccessCodeModal() { accessCodeBackdrop.classList.remove('visible'); }
+function openCreateCodeModal() {
+  if (!profile?.name) { openProfile(true); return; }
+  document.querySelector('#newMatrixCode').value = '';
+  document.querySelector('#createCodeStatus').textContent = '';
+  createCodeBackdrop.classList.add('visible');
+  document.querySelector('#newMatrixCode').focus();
+}
+function closeCreateCodeModal() { createCodeBackdrop.classList.remove('visible'); }
+document.querySelector('#hasMatrixCode').addEventListener('change', event => {
+  const hasCode = event.target.value === 'yes';
+  document.querySelector('#initialAccessCodeField').hidden = !hasCode;
+  document.querySelector('#initialCodeHint').hidden = !hasCode;
+  document.querySelector('#initialAccessCode').required = hasCode;
+});
 profileForm.addEventListener('submit', async event => {
   event.preventDefault();
   const submitButton = profileForm.querySelector('button[type="submit"]');
   const status = document.querySelector('#profileFormStatus');
   const response = { name: document.querySelector('#profileName').value.trim(), purpose: document.querySelector('#profilePurpose').value };
+  const hasExistingCode = isInitialProfileSetup && document.querySelector('#hasMatrixCode').value === 'yes';
+  const enteredCode = document.querySelector('#initialAccessCode').value.trim().toUpperCase();
   submitButton.disabled = true;
-  status.textContent = '正在儲存問卷…';
   try {
-    const result = await fetch(`${SUPABASE_URL}/rest/v1/profile_questionnaire_responses`, {
-      method: 'POST',
-      headers: {
-        apikey: SUPABASE_PUBLISHABLE_KEY,
-        Authorization: `Bearer ${SUPABASE_PUBLISHABLE_KEY}`,
-        'Content-Type': 'application/json',
-        Prefer: 'return=minimal'
-      },
-      body: JSON.stringify(response)
-    });
-    if (!result.ok) throw new Error(`HTTP ${result.status}`);
-    applyProfile(response);
+    if (hasExistingCode) {
+      status.textContent = '正在載入既有矩陣…';
+      const account = await matrixRequest('load', { code: enteredCode });
+      accessCode = enteredCode;
+      tasks = account.tasks || [];
+      applyProfile(account.profile);
+      try { localStorage.setItem(ACCESS_CODE_KEY, accessCode); } catch { /* 可再輸入矩陣編號 */ }
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); } catch { /* 保留本次工作階段資料 */ }
+      taskSyncPending = false;
+      taskSyncFailed = false;
+      refreshAccessControls();
+    } else {
+      if (accessCode) {
+        status.textContent = '正在儲存設定…';
+        await matrixRequest('profile', { ...response, code: accessCode });
+      } else {
+        status.textContent = '正在儲存設定…';
+      }
+      applyProfile(response);
+    }
     status.textContent = '';
     profileBackdrop.classList.remove('visible');
+    document.querySelector('#syncNotice').hidden = true;
+    render();
   } catch (error) {
-    console.error('問卷儲存失敗', error);
-    status.textContent = '問卷暫時無法儲存，請確認網路後再試一次。';
+    console.error('帳號設定失敗', error);
+    status.textContent = error.message || '目前無法建立帳號，請稍後重試。';
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+createCodeForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const submitButton = createCodeForm.querySelector('button[type="submit"]');
+  const status = document.querySelector('#createCodeStatus');
+  const chosenCode = document.querySelector('#newMatrixCode').value.trim().toUpperCase();
+  submitButton.disabled = true;
+  status.textContent = '正在建立編號並同步矩陣…';
+  try {
+    await matrixRequest('create', { code: chosenCode, name: profile.name, purpose: profile.purpose, tasks });
+    accessCode = chosenCode;
+    try { localStorage.setItem(ACCESS_CODE_KEY, accessCode); } catch { /* 可手動再次輸入編號 */ }
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); } catch { /* 保留本次工作階段資料 */ }
+    taskSyncPending = false;
+    taskSyncFailed = false;
+    refreshAccessControls();
+    document.querySelector('#syncNotice').hidden = true;
+    closeCreateCodeModal();
+    openAccessCodeModal();
+  } catch (error) {
+    status.textContent = error.message || '無法建立編號，請換一組再試。';
+  } finally {
+    submitButton.disabled = false;
+  }
+});
+accessCodeForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const submitButton = accessCodeForm.querySelector('button[type="submit"]');
+  const status = document.querySelector('#accessCodeStatus');
+  const enteredCode = document.querySelector('#accessCodeInput').value.trim().toUpperCase();
+  submitButton.disabled = true;
+  status.textContent = '正在載入矩陣…';
+  try {
+    const account = await matrixRequest('load', { code: enteredCode });
+    accessCode = enteredCode;
+    try { localStorage.setItem(ACCESS_CODE_KEY, accessCode); } catch { /* 仍可在本次工作階段使用 */ }
+    tasks = account.tasks || [];
+    applyProfile(account.profile);
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(tasks)); } catch { /* 保留本次工作階段資料 */ }
+    taskSyncPending = false;
+    taskSyncFailed = false;
+    refreshAccessControls();
+    document.querySelector('#syncNotice').hidden = true;
+    closeAccessCodeModal();
+    render();
+  } catch (error) {
+    status.textContent = error.message || '找不到這組編號，請檢查後再試。';
   } finally {
     submitButton.disabled = false;
   }
@@ -222,7 +310,16 @@ profileForm.addEventListener('submit', async event => {
 document.querySelector('#closeProfile').addEventListener('click', closeProfile);
 profileBackdrop.addEventListener('click', event => { if (event.target === profileBackdrop) closeProfile(); });
 document.querySelector('#profileBtn').addEventListener('click', openProfile);
-document.querySelector('#changeUserBtn').addEventListener('click', () => openProfile(true));
+document.querySelector('#changeUserBtn').addEventListener('click', openAccessCodeModal);
+document.querySelector('#createMatrixCodeBtn').addEventListener('click', openCreateCodeModal);
+document.querySelector('#closeAccessCode').addEventListener('click', closeAccessCodeModal);
+accessCodeBackdrop.addEventListener('click', event => { if (event.target === accessCodeBackdrop) closeAccessCodeModal(); });
+document.querySelector('#closeCreateCode').addEventListener('click', closeCreateCodeModal);
+createCodeBackdrop.addEventListener('click', event => { if (event.target === createCodeBackdrop) closeCreateCodeModal(); });
+document.querySelector('#copyAccessCode').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(accessCode); document.querySelector('#accessCodeStatus').textContent = '已複製編號。'; }
+  catch { document.querySelector('#accessCodeStatus').textContent = '請手動複製上方編號。'; }
+});
 function openModal(taskOrQuadrant = 'do') {
   const task = typeof taskOrQuadrant === 'object' ? taskOrQuadrant : null;
   form.reset();
@@ -294,16 +391,23 @@ matrix.addEventListener('drop', event => { const list = event.target.closest('.t
 
 document.querySelector('#exportBtn').addEventListener('click', () => { const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), tasks }, null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `priorix-backup-${new Date().toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(link.href); });
 document.querySelector('#importInput').addEventListener('change', async event => { const file = event.target.files[0]; if (!file) return; try { const data = JSON.parse(await file.text()); const imported = Array.isArray(data) ? data : data.tasks; if (!Array.isArray(imported)) throw new Error(); if (!window.confirm('匯入會取代目前所有任務，確定嗎？')) return; tasks = imported.map(task => ({ ...task, title: String(task.title || '').trim(), scope: inferScope(task), quadrant: legacyQuadrantMap[task.quadrant] || task.quadrant, project: task.project || '個人', dueLabel: task.dueLabel || dueText(task.due) })).filter(task => task.title && quadrantKeys.includes(task.quadrant)); save(); render(); } catch { window.alert('這不是有效的 PM 備份檔。'); } finally { event.target.value = ''; } });
-document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeModal(); closeProfile(); } });
-if (profile?.name && scopeKeys.includes(profile.purpose)) applyProfile(profile);
-else { render(); openProfile(); }
-(async () => {
-  const { data: { session } } = await supabaseClient.auth.getSession();
-  if (session) supabaseAccessToken = session.access_token;
-  else {
-    const { data, error } = await supabaseClient.auth.signInAnonymously();
-    if (error) throw error;
-    supabaseAccessToken = data.session.access_token;
-  }
-  await loadRemoteTasks();
-})().catch(error => { console.error('Supabase 初始化失敗', error); document.querySelector('#syncNotice').hidden = false; });
+document.addEventListener('keydown', event => { if (event.key === 'Escape') { closeModal(); closeProfile(); closeAccessCodeModal(); closeCreateCodeModal(); } });
+if (accessCode) {
+  if (profile?.name && scopeKeys.includes(profile.purpose)) applyProfile(profile);
+  render();
+  loadRemoteTasks().catch(error => {
+    console.error('矩陣載入失敗', error);
+    document.querySelector('#syncNotice').hidden = false;
+    if (error.status === 404) {
+      accessCode = '';
+      try { localStorage.removeItem(ACCESS_CODE_KEY); } catch { /* 可手動輸入有效編號 */ }
+      refreshAccessControls();
+      openAccessCodeModal();
+    }
+  });
+} else {
+  if (profile?.name && scopeKeys.includes(profile.purpose)) applyProfile(profile);
+  render();
+  if (!profile?.name || !scopeKeys.includes(profile.purpose)) openProfile(true);
+}
+refreshAccessControls();
