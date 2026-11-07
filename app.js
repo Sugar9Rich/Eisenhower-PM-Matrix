@@ -168,6 +168,14 @@ function render() {
 
 const backdrop = document.querySelector('#modalBackdrop');
 const form = document.querySelector('#taskForm');
+const taskDeleteZone = document.querySelector('#taskDeleteZone');
+const deleteTaskButton = document.createElement('button');
+deleteTaskButton.type = 'button';
+deleteTaskButton.id = 'deleteTaskBtn';
+deleteTaskButton.className = 'task-delete-button danger-button';
+deleteTaskButton.textContent = '刪除這項任務';
+deleteTaskButton.hidden = true;
+form.append(deleteTaskButton);
 const profileBackdrop = document.querySelector('#profileBackdrop');
 const profileForm = document.querySelector('#profileForm');
 const accessCodeBackdrop = document.querySelector('#accessCodeBackdrop');
@@ -326,6 +334,7 @@ function openModal(taskOrQuadrant = 'do') {
   document.querySelector('#taskId').value = task?.id || '';
   document.querySelector('#taskScope').value = task?.scope || profile?.purpose || 'personal';
   document.querySelector('#taskQuadrant').value = task?.quadrant || taskOrQuadrant;
+  deleteTaskButton.hidden = !task;
   if (task) {
     document.querySelector('#modalKicker').textContent = '編輯工作項目';
     document.querySelector('#modalTitle').textContent = '把任務調整到最適合的位置';
@@ -344,10 +353,21 @@ function openModal(taskOrQuadrant = 'do') {
   document.querySelector('#taskTitle').focus();
 }
 function closeModal() { backdrop.classList.remove('visible'); form.reset(); }
+function deleteTask(taskId) {
+  const taskIndex = tasks.findIndex(task => String(task.id) === String(taskId));
+  if (taskIndex < 0 || !window.confirm('確定要刪除這項任務？Supabase 會保留資料，不會實際刪除。')) return false;
+  tasks.splice(taskIndex, 1);
+  save();
+  render();
+  return true;
+}
 
 document.querySelector('#openModal').addEventListener('click', () => openModal());
 document.querySelector('#closeModal').addEventListener('click', closeModal);
 backdrop.addEventListener('click', event => { if (event.target === backdrop) closeModal(); });
+deleteTaskButton.addEventListener('click', () => {
+  if (deleteTask(document.querySelector('#taskId').value)) closeModal();
+});
 document.querySelectorAll('[data-add]').forEach(button => button.addEventListener('click', () => openModal(button.dataset.add)));
 document.querySelector('#searchInput').addEventListener('input', render);
 document.querySelectorAll('[data-scope]').forEach(button => button.addEventListener('click', () => setActiveScope(button.dataset.scope)));
@@ -383,11 +403,40 @@ form.addEventListener('submit', event => {
 });
 
 const matrix = document.querySelector('#matrixGrid');
-matrix.addEventListener('dragstart', event => { const card = event.target.closest('.task-card'); if (!card) return; card.classList.add('dragging'); event.dataTransfer.setData('text/plain', card.dataset.id); });
-matrix.addEventListener('dragend', event => event.target.closest('.task-card')?.classList.remove('dragging'));
+let draggedTaskId = '';
+matrix.addEventListener('dragstart', event => {
+  const card = event.target.closest('.task-card');
+  if (!card) return;
+  draggedTaskId = card.dataset.id;
+  card.classList.add('dragging');
+  event.dataTransfer.setData('text/plain', draggedTaskId);
+  event.dataTransfer.effectAllowed = 'move';
+  taskDeleteZone.hidden = false;
+});
+matrix.addEventListener('dragend', event => {
+  event.target.closest('.task-card')?.classList.remove('dragging');
+  draggedTaskId = '';
+  taskDeleteZone.hidden = true;
+  taskDeleteZone.classList.remove('drag-over');
+});
 matrix.addEventListener('dragover', event => { const list = event.target.closest('.task-list'); if (list) { event.preventDefault(); list.classList.add('drag-over'); } });
 matrix.addEventListener('dragleave', event => event.target.closest('.task-list')?.classList.remove('drag-over'));
 matrix.addEventListener('drop', event => { const list = event.target.closest('.task-list'); if (!list) return; event.preventDefault(); list.classList.remove('drag-over'); const task = tasks.find(item => String(item.id) === event.dataTransfer.getData('text/plain')); if (task) { task.quadrant = list.closest('.quadrant').dataset.quadrant; save(); render(); } });
+taskDeleteZone.addEventListener('dragover', event => {
+  if (!draggedTaskId) return;
+  event.preventDefault();
+  event.dataTransfer.dropEffect = 'move';
+  taskDeleteZone.classList.add('drag-over');
+});
+taskDeleteZone.addEventListener('dragleave', event => {
+  if (!taskDeleteZone.contains(event.relatedTarget)) taskDeleteZone.classList.remove('drag-over');
+});
+taskDeleteZone.addEventListener('drop', event => {
+  if (!draggedTaskId) return;
+  event.preventDefault();
+  taskDeleteZone.classList.remove('drag-over');
+  deleteTask(draggedTaskId);
+});
 
 document.querySelector('#exportBtn').addEventListener('click', () => { const blob = new Blob([JSON.stringify({ version: 1, exportedAt: new Date().toISOString(), tasks }, null, 2)], { type: 'application/json' }); const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `priorix-backup-${new Date().toISOString().slice(0, 10)}.json`; link.click(); URL.revokeObjectURL(link.href); });
 document.querySelector('#importInput').addEventListener('change', async event => { const file = event.target.files[0]; if (!file) return; try { const data = JSON.parse(await file.text()); const imported = Array.isArray(data) ? data : data.tasks; if (!Array.isArray(imported)) throw new Error(); if (!window.confirm('匯入會取代目前所有任務，確定嗎？')) return; tasks = imported.map(task => ({ ...task, title: String(task.title || '').trim(), scope: inferScope(task), quadrant: legacyQuadrantMap[task.quadrant] || task.quadrant, project: task.project || '個人', dueLabel: task.dueLabel || dueText(task.due) })).filter(task => task.title && quadrantKeys.includes(task.quadrant)); save(); render(); } catch { window.alert('這不是有效的 PM 備份檔。'); } finally { event.target.value = ''; } });

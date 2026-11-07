@@ -7,3 +7,12 @@
 .mode-switch{display:flex;align-items:center;gap:2px;padding:3px;background:#f2f5f9;border:1px solid var(--line);border-radius:8px}.mode-button{height:27px;padding:0 8px;border-radius:6px;color:#8491a3;font-size:10px;white-space:nowrap}.mode-button:hover{color:var(--blue)}.mode-button.active{background:#fff;color:var(--blue);box-shadow:0 1px 4px rgba(29,49,84,.08);font-weight:700}.scope-tag{padding:1px 5px;border-radius:3px;font-size:9px}.scope-tag.pm{background:#edf3ff;color:#5277e4}.scope-tag.personal{background:#f4efff;color:#856bd0}@media(max-width:1000px){.mode-switch{order:2}.filter-button{order:3}.backup-button{order:4}}@media(max-width:760px){.mode-switch{width:100%;justify-content:space-between;order:2}.mode-button{flex:1}.filter-button{order:3}}
 .profile-intro{margin:-12px 0 20px;color:#8b97a8;font-size:12px;line-height:1.6}.profile-modal{max-width:430px}
 #syncNotice{margin:0 0 18px;padding:11px 14px;border:1px solid #f3d4ad;border-radius:8px;background:#fff8ef;color:#9b622c;font-size:12px}
+.task-delete-zone{display:flex;align-items:center;justify-content:center;gap:12px;margin:14px 0 0;padding:16px;border:1px dashed #e7aaa3;border-radius:12px;background:#fff8f7;color:#b95149;text-align:left;transition:background .15s,border-color .15s,transform .15s}
+.task-delete-zone[hidden],.task-delete-button[hidden]{display:none}
+.task-delete-zone.drag-over{border-color:#d36b63;background:#fff0ee;transform:scale(1.01)}
+.task-delete-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#fbe6e3;font-size:19px}
+.task-delete-zone strong,.task-delete-zone small{display:block}
+.task-delete-zone strong{font-size:12px}
+.task-delete-zone small{margin-top:3px;color:#9b7774;font-size:10px}
+.task-delete-button{width:100%;height:38px;margin-top:11px;border:1px solid #f0d9d5;border-radius:8px;background:#fff8f7;color:#b95149;font-size:12px;font-weight:600}
+.task-delete-button:hover{border-color:#e7aaa3;background:#fff0ee}
